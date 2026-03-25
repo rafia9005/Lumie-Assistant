@@ -15,6 +15,8 @@ export default defineNuxtConfig({
   runtimeConfig: {
     // Server-side only (not exposed to client)
     aura2Token: process.env.AURA_2_TOKEN,
-    geminiToken: process.env.GEMINI_API_KEY
+    geminiToken: process.env.GEMINI_API_KEY,
+    cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID,
+    cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN,
   },
 })

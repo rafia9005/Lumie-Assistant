@@ -109,163 +109,67 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import type { ChatMessage } from '../../types/chat'
 import { useChatToSpeech } from '../../composables/useChatToSpeech'
+import { useMediaRecorderVoice } from '../../composables/useMediaRecorderVoice'
 
 const userInput = ref('')
 const messages = ref<ChatMessage[]>([])
-const isListening = ref(false)
-const interimTranscript = ref('')
-const recognition = ref<any>(null)
 const errorMessage = ref('')
-const restartAttempts = ref(0)
-const maxRestartAttempts = 3
 
 const { isLoading, isSpeaking, characterState, speakWithCharacter, stopSpeaking } = useChatToSpeech()
+const { isRecording, startRecording, stopRecording, transcribeAudio, errorMessage: voiceError } = useMediaRecorderVoice()
 
-// Initialize Speech Recognition
-onMounted(() => {
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-  
-  if (!SpeechRecognition) {
-    console.error('Speech Recognition API not supported in this browser')
-    errorMessage.value = 'Speech Recognition not supported. Please use Chrome or Edge browser.'
-    return
-  }
-  
-  // Log browser info for debugging
-  console.log('🌐 Browser:', navigator.userAgent)
-  console.log('🔐 Secure context:', window.isSecureContext)
-  console.log('🎤 Speech Recognition available:', !!SpeechRecognition)
+// Use isRecording as isListening for UI compatibility
+const isListening = ref(false)
+const interimTranscript = ref('')
 
-  recognition.value = new SpeechRecognition()
-  recognition.value.continuous = true // Always listen
-  recognition.value.interimResults = true // Show partial results
-  recognition.value.language = 'en-US'
-
-  recognition.value.onresult = (event: any) => {
-    console.log('🎤 Speech recognition result:', event)
-    let finalTranscript = ''
-    let interim = ''
-
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript
-      
-      if (event.results[i].isFinal) {
-        finalTranscript += transcript + ' '
-        console.log('✅ Final transcript:', transcript)
-      } else {
-        interim += transcript
-        console.log('⏳ Interim transcript:', transcript)
-      }
-    }
-
-    interimTranscript.value = interim
-
-    if (finalTranscript.trim()) {
-      // User finished speaking - send to AI
-      handleVoiceInput(finalTranscript.trim())
-    }
-  }
-
-  recognition.value.onerror = (event: any) => {
-    console.error('❌ Speech recognition error:', event.error)
-    console.error('📋 Error details:', event)
-    console.error('🔍 Error message:', event.message)
-    
-    // Handle different error types
-    if (event.error === 'no-speech') {
-      console.log('⚠️ No speech detected, continuing to listen...')
-      // Don't stop on no-speech - just continue
-    } else if (event.error === 'network') {
-      // Network error can mean:
-      // 1. No internet (rare - usually caught earlier)
-      // 2. Google's speech service is unreachable
-      // 3. Browser/API configuration issue
-      // 4. CORS or security policy blocking the request
-      errorMessage.value = 'Network error: Speech Recognition service unavailable. This may be due to browser limitations or Google service connectivity.'
-      console.error('🌐 Network error - Possible causes:')
-      console.error('  - Google Speech API unreachable')
-      console.error('  - Browser security restrictions')
-      console.error('  - Network firewall/proxy blocking requests')
-      console.error('  - Try using Chrome or Edge browser')
-      isListening.value = false
-      restartAttempts.value = 0
-    } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-      errorMessage.value = 'Microphone access denied. Please allow microphone permissions.'
-      console.error('🎤 Microphone permission denied')
-      isListening.value = false
-      restartAttempts.value = 0
-    } else if (event.error === 'aborted') {
-      console.log('⏹️ Recognition aborted by user')
-      isListening.value = false
-      restartAttempts.value = 0
-    } else {
-      errorMessage.value = `Speech recognition error: ${event.error}`
-      console.error('❌ Unknown error:', event.error)
-      isListening.value = false
-      restartAttempts.value = 0
-    }
-  }
-
-  recognition.value.onend = () => {
-    console.log('🔚 Speech recognition ended')
-    if (isListening.value) {
-      // Restart if still in listening mode
-      if (restartAttempts.value < maxRestartAttempts) {
-        console.log(`🔄 Restarting speech recognition... (attempt ${restartAttempts.value + 1}/${maxRestartAttempts})`)
-        restartAttempts.value++
-        
-        // Add a small delay to prevent rapid restart loops
-        setTimeout(() => {
-          try {
-            recognition.value.start()
-          } catch (err) {
-            console.error('Failed to restart recognition:', err)
-            errorMessage.value = 'Failed to restart microphone. Please try again.'
-            isListening.value = false
-            restartAttempts.value = 0
-          }
-        }, 300)
-      } else {
-        console.warn('⚠️ Max restart attempts reached')
-        errorMessage.value = 'Speech recognition stopped after multiple retries. Please restart manually.'
-        isListening.value = false
-        restartAttempts.value = 0
-      }
-    }
+// Sync voice error with main error message
+watch(voiceError, (newError) => {
+  if (newError) {
+    errorMessage.value = newError
   }
 })
 
-onUnmounted(() => {
-  if (recognition.value && isListening.value) {
-    recognition.value.stop()
-  }
-})
-
-const toggleMicrophone = () => {
-  if (!recognition.value) {
-    alert('Speech recognition not supported in your browser. Please use Chrome or Edge.')
-    return
-  }
-
-  if (isListening.value) {
-    console.log('⏹️ Stopping microphone...')
-    recognition.value.stop()
-    isListening.value = false
-    interimTranscript.value = ''
-    errorMessage.value = ''
-    restartAttempts.value = 0
+watch(isRecording, (recording) => {
+  isListening.value = recording
+  if (recording) {
+    interimTranscript.value = 'Recording... (speak now)'
   } else {
-    console.log('🎤 Starting microphone...')
-    errorMessage.value = ''
-    restartAttempts.value = 0
+    interimTranscript.value = ''
+  }
+})
+
+const toggleMicrophone = async () => {
+  errorMessage.value = ''
+  
+  if (isRecording.value) {
+    // Stop recording and transcribe
+    console.log('⏹️ Stopping recording...')
+    const audioBlob = await stopRecording()
     
-    try {
-      recognition.value.start()
-      isListening.value = true
-    } catch (err) {
-      console.error('Failed to start recognition:', err)
-      errorMessage.value = 'Failed to start microphone. It may already be in use.'
-      isListening.value = false
+    if (!audioBlob) {
+      errorMessage.value = 'Failed to record audio'
+      return
+    }
+
+    interimTranscript.value = 'Transcribing...'
+    
+    // Transcribe the audio
+    const transcript = await transcribeAudio(audioBlob)
+    
+    if (transcript) {
+      await handleVoiceInput(transcript)
+    } else {
+      errorMessage.value = 'Failed to transcribe audio. Please try again.'
+    }
+    
+    interimTranscript.value = ''
+  } else {
+    // Start recording
+    console.log('🎤 Starting recording...')
+    const started = await startRecording()
+    
+    if (!started) {
+      errorMessage.value = 'Failed to start microphone. Please check permissions.'
     }
   }
 }
