@@ -85,12 +85,83 @@ export const useMediaRecorderVoice = () => {
     return await transcribeAudio(audioBlob)
   }
 
+  const recordUntilSilence = async (): Promise<Blob | null> => {
+    const started = await startRecording()
+    if (!started) return null
+
+    return new Promise((resolve) => {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const stream = (mediaRecorder.value as any)?.stream
+      if (!stream) {
+        stopRecording().then(resolve)
+        return
+      }
+
+      const source = audioContext.createMediaStreamSource(stream)
+      const analyser = audioContext.createAnalyser()
+      analyser.fftSize = 2048
+      source.connect(analyser)
+
+      const buffer = new Uint8Array(analyser.fftSize)
+      let hasSpoken = false
+      let silenceStart = 0
+      const SILENCE_THRESHOLD = 0.015
+      const SILENCE_DURATION_MS = 1200
+
+      const monitor = async () => {
+        if (!isRecording.value) {
+          const audioBlob = await stopRecording()
+          resolve(audioBlob)
+          return
+        }
+
+        analyser.getByteTimeDomainData(buffer)
+
+        let sumSquares = 0
+        for (let i = 0; i < buffer.length; i++) {
+          const normalized = (buffer[i] - 128) / 128
+          sumSquares += normalized * normalized
+        }
+
+        const volume = Math.sqrt(sumSquares / buffer.length)
+        const now = performance.now()
+
+        if (volume > SILENCE_THRESHOLD) {
+          hasSpoken = true
+          silenceStart = 0
+        } else if (hasSpoken) {
+          if (silenceStart === 0) {
+            silenceStart = now
+          } else if (now - silenceStart >= SILENCE_DURATION_MS) {
+            const audioBlob = await stopRecording()
+            resolve(audioBlob)
+            return
+          }
+        }
+
+        requestAnimationFrame(() => {
+          monitor().catch(() => resolve(null))
+        })
+      }
+
+      monitor().catch(() => resolve(null))
+    })
+  }
+
+  const recordUntilSilenceAndTranscribe = async (): Promise<string | null> => {
+    const audioBlob = await recordUntilSilence()
+    if (!audioBlob) return null
+    return transcribeAudio(audioBlob)
+  }
+
   return {
     isRecording,
     errorMessage,
     startRecording,
     stopRecording,
     transcribeAudio,
-    recordAndTranscribe
+    recordAndTranscribe,
+    recordUntilSilence,
+    recordUntilSilenceAndTranscribe
   }
 }
