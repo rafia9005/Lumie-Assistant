@@ -127,8 +127,14 @@ onMounted(() => {
   
   if (!SpeechRecognition) {
     console.error('Speech Recognition API not supported in this browser')
+    errorMessage.value = 'Speech Recognition not supported. Please use Chrome or Edge browser.'
     return
   }
+  
+  // Log browser info for debugging
+  console.log('🌐 Browser:', navigator.userAgent)
+  console.log('🔐 Secure context:', window.isSecureContext)
+  console.log('🎤 Speech Recognition available:', !!SpeechRecognition)
 
   recognition.value = new SpeechRecognition()
   recognition.value.continuous = true // Always listen
@@ -162,14 +168,25 @@ onMounted(() => {
 
   recognition.value.onerror = (event: any) => {
     console.error('❌ Speech recognition error:', event.error)
+    console.error('📋 Error details:', event)
+    console.error('🔍 Error message:', event.message)
     
     // Handle different error types
     if (event.error === 'no-speech') {
       console.log('⚠️ No speech detected, continuing to listen...')
       // Don't stop on no-speech - just continue
     } else if (event.error === 'network') {
-      errorMessage.value = 'Network error: Check your internet connection'
-      console.error('🌐 Network error - Speech Recognition requires internet')
+      // Network error can mean:
+      // 1. No internet (rare - usually caught earlier)
+      // 2. Google's speech service is unreachable
+      // 3. Browser/API configuration issue
+      // 4. CORS or security policy blocking the request
+      errorMessage.value = 'Network error: Speech Recognition service unavailable. This may be due to browser limitations or Google service connectivity.'
+      console.error('🌐 Network error - Possible causes:')
+      console.error('  - Google Speech API unreachable')
+      console.error('  - Browser security restrictions')
+      console.error('  - Network firewall/proxy blocking requests')
+      console.error('  - Try using Chrome or Edge browser')
       isListening.value = false
       restartAttempts.value = 0
     } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {

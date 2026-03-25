@@ -6,12 +6,15 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['./app/app.css'],
   vite: {
-    plugins: [tailwindcss()]
+    plugins: [tailwindcss()],
+    server: {
+      allowedHosts: ["a046-103-88-169-131.ngrok-free.app"]
+    }
   },
 
   runtimeConfig: {
     // Server-side only (not exposed to client)
     aura2Token: process.env.AURA_2_TOKEN,
     geminiToken: process.env.GEMINI_API_KEY
-  }
+  },
 })
