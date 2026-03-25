@@ -81,8 +81,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, watch } from 'vue'
 import type { ChatMessage } from '~/types/chat'
+import { useChatToSpeech } from '~/composables/useChatToSpeech'
 
 const userInput = ref('')
 const messages = ref<ChatMessage[]>([])
