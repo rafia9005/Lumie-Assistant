@@ -1,0 +1,30 @@
+{
+  "name": "lumie-workers",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers for Lumie Assistant - Whisper STT and Aura-2 TTS",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "deploy:prod": "wrangler deploy --env production",
+    "deploy:staging": "wrangler deploy --env staging",
+    "dev": "wrangler dev",
+    "dev:staging": "wrangler dev --env staging",
+    "secret:set": "wrangler secret put",
+    "secret:list": "wrangler secret list"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "wrangler": "^3.64.0"
+  },
+  "author": "Lumie Team",
+  "license": "MIT",
+  "keywords": [
+    "cloudflare-workers",
+    "whisper",
+    "aura-2",
+    "tts",
+    "stt",
+    "ai"
+  ]
+}

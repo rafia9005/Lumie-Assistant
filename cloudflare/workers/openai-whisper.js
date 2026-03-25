@@ -97,7 +97,7 @@ export default {
       }
 
       // Run Whisper AI model
-      const response = await env.AI.run(
+      const response = await env.Lumine.run(
         '@cf/openai/whisper',
         {
           audio: [...new Uint8Array(audioData)]

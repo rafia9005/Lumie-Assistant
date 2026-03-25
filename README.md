@@ -112,29 +112,65 @@ npm run preview
 - **`nuxt.config.ts`**: Nuxt configuration with runtime environment variables
 - **`types/`**: TypeScript interfaces for Chat and Speaker types
 
-## Cloudflare Workers Setup
+## Cloudflare Workers Deployment
 
-The application uses Cloudflare Workers to proxy API calls for Whisper and ElevenLabs:
+The application uses Cloudflare Workers to proxy AI model calls for Whisper (STT) and Aura-2 (TTS).
 
-### Whisper Worker (`cloudflare/workers/openai-whisper.js`)
-```javascript
-// Handles /whisper endpoint
-// Accepts: multipart/form-data with 'audio' field
-// Returns: { text: "transcribed text" }
-```
+### Quick Setup
 
-### ElevenLabs Worker (`cloudflare/workers/aura-2.js`)
-```javascript
-// Handles /aura2 endpoint
-// Accepts: JSON with { text: "..." }
-// Returns: Audio stream
-```
+1. **Install Wrangler CLI**:
+   ```bash
+   npm install -g wrangler
+   wrangler login
+   ```
 
-Deploy to Cloudflare:
+2. **Deploy Workers**:
+   ```bash
+   cd cloudflare/workers
+   npm install
+   wrangler deploy
+   ```
+
+3. **Set API Key Secret**:
+   ```bash
+   wrangler secret put API_KEY
+   # Paste your secure bearer token
+   ```
+
+4. **Update `.env`** with worker URLs:
+   ```env
+   WORKER_TOKEN=your_bearer_token
+   OPENAI_WHISPER_ENDPOINT=https://lumie-workers.YOUR_ACCOUNT.workers.dev
+   AURA_2_ENDPOINT=https://lumie-workers.YOUR_ACCOUNT.workers.dev/aura2
+   ```
+
+### Detailed Guide
+
+See `cloudflare/workers/DEPLOYMENT.md` for comprehensive deployment instructions including:
+- Environment configuration
+- Secret management
+- Environment-specific deployments (dev, staging, production)
+- Worker endpoints and parameters
+- Troubleshooting and best practices
+
+### Worker Endpoints
+
+**Whisper (STT)**:
 ```bash
-cd cloudflare/workers
-wrangler publish
+POST https://your-worker.workers.dev/
+Authorization: Bearer YOUR_API_KEY
+Content-Type: multipart/form-data
+Body: audio file
 ```
+
+**Aura-2 (TTS)**:
+```bash
+POST https://your-worker.workers.dev/aura2
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+Body: { "text": "Hello world" }
+```
+
 
 ## Development Tips
 

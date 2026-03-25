@@ -1,1 +1,51 @@
+name = "lumie-workers"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
 
+# Replace with your Cloudflare account ID
+account_id = "YOUR_ACCOUNT_ID"
+
+# Replace with your zone ID and domain
+routes = [
+  { pattern = "api.example.com/whisper", zone_name = "example.com" },
+  { pattern = "api.example.com/aura2", zone_name = "example.com" }
+]
+
+# Environment variables
+vars = { ENVIRONMENT = "production" }
+
+# AI Binding for Cloudflare Workers AI (Lumine)
+[[ai]]
+binding = "Lumine"
+
+# Development environment
+[env.development]
+name = "lumie-workers-dev"
+vars = { ENVIRONMENT = "development" }
+
+# Staging environment
+[env.staging]
+name = "lumie-workers-staging"
+vars = { ENVIRONMENT = "staging" }
+routes = [
+  { pattern = "staging-api.example.com/whisper", zone_name = "example.com" },
+  { pattern = "staging-api.example.com/aura2", zone_name = "example.com" }
+]
+
+# Production environment
+[env.production]
+name = "lumie-workers-prod"
+vars = { ENVIRONMENT = "production" }
+routes = [
+  { pattern = "api.example.com/whisper", zone_name = "example.com" },
+  { pattern = "api.example.com/aura2", zone_name = "example.com" }
+]
+
+# Build configuration
+[build]
+command = "npm install"
+watch_paths = ["src/**/*.js"]
+
+[build.upload]
+format = "service-worker"
+main = "openai-whisper.js"
