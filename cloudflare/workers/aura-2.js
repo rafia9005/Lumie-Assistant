@@ -27,7 +27,8 @@ export default {
       if (body.container) inputs.container = body.container;
       if (body.sample_rate) inputs.sample_rate = body.sample_rate;
       if (body.bit_rate) inputs.bit_rate = body.bit_rate;
-
+      
+      // change Lumine with your variable name if you use different one
       const audioStream = await env.Lumine.run("@cf/deepgram/aura-2-en", inputs);
 
       let contentType = "audio/mpeg"; 
