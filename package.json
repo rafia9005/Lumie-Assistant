@@ -10,8 +10,13 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@google/genai": "^1.46.0",
+    "axios": "^1.13.6",
     "nuxt": "^4.4.2",
     "vue": "^3.5.30",
     "vue-router": "^5.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0"
   }
 }
