@@ -87,6 +87,11 @@
 
     <!-- Status Indicator -->
     <div class="mt-6 text-center">
+      <!-- Error Message -->
+      <div v-if="errorMessage" class="mb-3 px-4 py-2 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+        {{ errorMessage }}
+      </div>
+      
       <p class="text-sm text-gray-600">
         <span v-if="isListening" class="text-red-600 font-semibold">🔴 Listening...</span>
         <span v-else-if="isLoading" class="text-yellow-600 font-semibold">🟡 Yuzu is thinking...</span>
@@ -102,14 +107,17 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import type { ChatMessage } from '~/types/chat'
-import { useChatToSpeech } from '~/composables/useChatToSpeech'
+import type { ChatMessage } from '../../types/chat'
+import { useChatToSpeech } from '../../composables/useChatToSpeech'
 
 const userInput = ref('')
 const messages = ref<ChatMessage[]>([])
 const isListening = ref(false)
 const interimTranscript = ref('')
 const recognition = ref<any>(null)
+const errorMessage = ref('')
+const restartAttempts = ref(0)
+const maxRestartAttempts = 3
 
 const { isLoading, isSpeaking, characterState, speakWithCharacter, stopSpeaking } = useChatToSpeech()
 
@@ -154,10 +162,30 @@ onMounted(() => {
 
   recognition.value.onerror = (event: any) => {
     console.error('❌ Speech recognition error:', event.error)
+    
+    // Handle different error types
     if (event.error === 'no-speech') {
       console.log('⚠️ No speech detected, continuing to listen...')
-    } else {
+      // Don't stop on no-speech - just continue
+    } else if (event.error === 'network') {
+      errorMessage.value = 'Network error: Check your internet connection'
+      console.error('🌐 Network error - Speech Recognition requires internet')
       isListening.value = false
+      restartAttempts.value = 0
+    } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      errorMessage.value = 'Microphone access denied. Please allow microphone permissions.'
+      console.error('🎤 Microphone permission denied')
+      isListening.value = false
+      restartAttempts.value = 0
+    } else if (event.error === 'aborted') {
+      console.log('⏹️ Recognition aborted by user')
+      isListening.value = false
+      restartAttempts.value = 0
+    } else {
+      errorMessage.value = `Speech recognition error: ${event.error}`
+      console.error('❌ Unknown error:', event.error)
+      isListening.value = false
+      restartAttempts.value = 0
     }
   }
 
@@ -165,8 +193,27 @@ onMounted(() => {
     console.log('🔚 Speech recognition ended')
     if (isListening.value) {
       // Restart if still in listening mode
-      console.log('🔄 Restarting speech recognition...')
-      recognition.value.start()
+      if (restartAttempts.value < maxRestartAttempts) {
+        console.log(`🔄 Restarting speech recognition... (attempt ${restartAttempts.value + 1}/${maxRestartAttempts})`)
+        restartAttempts.value++
+        
+        // Add a small delay to prevent rapid restart loops
+        setTimeout(() => {
+          try {
+            recognition.value.start()
+          } catch (err) {
+            console.error('Failed to restart recognition:', err)
+            errorMessage.value = 'Failed to restart microphone. Please try again.'
+            isListening.value = false
+            restartAttempts.value = 0
+          }
+        }, 300)
+      } else {
+        console.warn('⚠️ Max restart attempts reached')
+        errorMessage.value = 'Speech recognition stopped after multiple retries. Please restart manually.'
+        isListening.value = false
+        restartAttempts.value = 0
+      }
     }
   }
 })
@@ -179,7 +226,7 @@ onUnmounted(() => {
 
 const toggleMicrophone = () => {
   if (!recognition.value) {
-    alert('Speech recognition not supported in your browser')
+    alert('Speech recognition not supported in your browser. Please use Chrome or Edge.')
     return
   }
 
@@ -188,10 +235,21 @@ const toggleMicrophone = () => {
     recognition.value.stop()
     isListening.value = false
     interimTranscript.value = ''
+    errorMessage.value = ''
+    restartAttempts.value = 0
   } else {
     console.log('🎤 Starting microphone...')
-    recognition.value.start()
-    isListening.value = true
+    errorMessage.value = ''
+    restartAttempts.value = 0
+    
+    try {
+      recognition.value.start()
+      isListening.value = true
+    } catch (err) {
+      console.error('Failed to start recognition:', err)
+      errorMessage.value = 'Failed to start microphone. It may already be in use.'
+      isListening.value = false
+    }
   }
 }
 
@@ -207,10 +265,15 @@ const handleVoiceInput = async (text: string) => {
   interimTranscript.value = ''
 
   // Send to chat API and get speech
-  await speakWithCharacter(text)
+  const response = await speakWithCharacter(text)
   
   // Add AI response to messages
-  // Note: speakWithCharacter already handles TTS
+  if (response?.text) {
+    messages.value.push({
+      role: 'assistant',
+      text: response.text
+    })
+  }
 }
 
 const handleSend = async () => {
@@ -226,7 +289,15 @@ const handleSend = async () => {
   userInput.value = ''
 
   // Send to chat API and get speech
-  await speakWithCharacter(input)
+  const response = await speakWithCharacter(input)
+  
+  // Add AI response to messages
+  if (response?.text) {
+    messages.value.push({
+      role: 'assistant',
+      text: response.text
+    })
+  }
 }
 
 // Watch for chat updates and sync messages

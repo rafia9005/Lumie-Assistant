@@ -82,14 +82,16 @@ export const useChatToSpeech = () => {
   const speakWithCharacter = async (userInput: string, sessionId = 'default') => {
     // Step 1: Send to chat API
     const chatResponse = await sendChatMessage(userInput, sessionId)
-    if (!chatResponse?.text) return
+    if (!chatResponse?.text) return null
 
     // Step 2: Convert AI response to speech
     const audioBlob = await sendTextToSpeech(chatResponse.text)
-    if (!audioBlob) return
+    if (!audioBlob) return chatResponse
 
     // Step 3: Play audio with character animation
     playAudio(audioBlob)
+    
+    return chatResponse
   }
 
   /**
