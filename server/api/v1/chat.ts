@@ -63,25 +63,23 @@ export default defineEventHandler(async (event) => {
 
     const ai = new GoogleGenAI({ apiKey: config.geminiToken });
 
-    // Load chat history and build contents
-    const history = await loadChat(sessionId);
-    const contents: any[] = [];
+     // Load chat history and build contents
+     const history = await loadChat(sessionId);
+     const contents: any[] = [];
 
-    // Add history messages
-    for (const m of history) {
-        // Map stored roles to Gemini roles: 'assistant' -> 'model', others -> 'user'
-        const role = m.role === 'assistant' ? 'model' : 'user';
-        contents.push({ role, parts: [{ text: m.text }] });
-    }
+     // Always prepend system prompt to maintain character consistency
+     const userMessage = `${systemPrompt}\n\n${input}`;
 
-    // Add current user message (prepend system prompt only on first message)
-    let userMessage = input;
-    if (history.length === 0) {
-        // First message: include Yuzu's system prompt
-        userMessage = `${systemPrompt}\n\n${input}`;
-    }
-    contents.push({ role: 'user', parts: [{ text: userMessage }] });
-    await appendMessage(sessionId, { role: 'user', text: input });
+     // Add history messages
+     for (const m of history) {
+         // Map stored roles to Gemini roles: 'assistant' -> 'model', others -> 'user'
+         const role = m.role === 'assistant' ? 'model' : 'user';
+         contents.push({ role, parts: [{ text: m.text }] });
+     }
+
+     // Add current user message with system prompt
+     contents.push({ role: 'user', parts: [{ text: userMessage }] });
+     await appendMessage(sessionId, { role: 'user', text: input });
 
     try {
         const modelConfig = { thinkingConfig: { thinkingBudget: -1 } };
