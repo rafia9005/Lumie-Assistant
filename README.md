@@ -2,6 +2,8 @@
 
 A modern AI voice chat application with real-time speech recognition, intelligent responses, and expressive character animations.
 
+![Yuzu Character](./public/idle.png)
+
 ## Features
 
 ### Voice Chat
