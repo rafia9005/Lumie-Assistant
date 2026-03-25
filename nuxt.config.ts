@@ -16,5 +16,7 @@ export default defineNuxtConfig({
     // Server-side only (not exposed to client)
     workerToken: process.env.WORKER_TOKEN,
     geminiToken: process.env.GEMINI_API_KEY,
+    aura2Endpoint: process.env.AURA_2_ENDPOINT,
+    whisperEndpoint: process.env.OPENAI_WHISPER_ENDPOINT,
   },
 })

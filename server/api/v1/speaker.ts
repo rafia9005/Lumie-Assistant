@@ -1,7 +1,6 @@
 import type { AuraInput } from '../../../types/speaker'
 
 export default defineEventHandler(async (event) => {
-  // Only allow POST method
   if (event.method !== 'POST') {
     throw createError({
       statusCode: 405,
@@ -10,16 +9,23 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig()
-  const AURA_2_TOKEN = config.workerToken
+  const WORKER_TOKEN = config.workerToken
+  const AURA_2_ENDPOINT = config.aura2Endpoint
 
-  if (!AURA_2_TOKEN) {
+  if (!WORKER_TOKEN) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'AURA_2_TOKEN not configured'
+      statusMessage: 'WORKER_TOKEN not configured'
     })
   }
 
-  // Parse request body
+  if (!AURA_2_ENDPOINT) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'AURA_2_ENDPOINT not configured'
+    })
+  }
+
   const body = await readBody<AuraInput>(event)
 
   if (!body.text || typeof body.text !== 'string') {
@@ -29,7 +35,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  // Build request payload
   const payload: AuraInput = {
     text: body.text
   }
@@ -41,34 +46,28 @@ export default defineEventHandler(async (event) => {
   if (body.bit_rate) payload.bit_rate = body.bit_rate
 
   try {
-    const response = await fetch('https://lumie.rafiidev01.workers.dev/', {
+    const response = await fetch(AURA_2_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${AURA_2_TOKEN}`
+        'Authorization': `Bearer ${WORKER_TOKEN}`
       },
       body: JSON.stringify(payload)
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      // Return error directly from worker
       setResponseHeader(event, 'Content-Type', 'application/json')
       setResponseStatus(event, response.status)
       return errorData
     }
 
-    // Get content type from worker response
     const contentType = response.headers.get('Content-Type') || 'audio/mpeg'
-
-    // Set response headers
     setResponseHeader(event, 'Content-Type', contentType)
     setResponseHeader(event, 'Cache-Control', 'no-cache')
 
-    // Return audio stream
     return response.body
   } catch (error: unknown) {
-    // Re-throw if already a createError
     if (error && typeof error === 'object' && 'statusCode' in error) {
       throw error
     }

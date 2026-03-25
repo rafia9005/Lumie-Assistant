@@ -1,7 +1,6 @@
 import { readMultipartFormData } from 'h3'
 
 export default defineEventHandler(async (event) => {
-  // Only allow POST method
   if (event.method !== 'POST') {
     throw createError({
       statusCode: 405,
@@ -10,18 +9,24 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig()
-  const CLOUDFLARE_WORKER_URL = process.env.CLOUDFLARE_WORKER_URL || config.cloudflareWorkerUrl
-  const CLOUDFLARE_AUTH_TOKEN = process.env.CLOUDFLARE_AUTH_TOKEN || config.cloudflareAuthToken
+  const WORKER_TOKEN = config.workerToken
+  const WHISPER_ENDPOINT = config.whisperEndpoint
 
-  if (!CLOUDFLARE_WORKER_URL) {
+  if (!WHISPER_ENDPOINT) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Cloudflare Worker URL not configured. Please deploy the worker and set CLOUDFLARE_WORKER_URL in .env'
+      statusMessage: 'OPENAI_WHISPER_ENDPOINT not configured in .env'
+    })
+  }
+
+  if (!WORKER_TOKEN) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'WORKER_TOKEN not configured in .env'
     })
   }
 
   try {
-    // Parse multipart form data (audio file)
     const formData = await readMultipartFormData(event)
     
     if (!formData || formData.length === 0) {
@@ -40,28 +45,23 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    console.log(`📤 Sending ${audioFile.data.length} bytes to Cloudflare Worker...`)
+    console.log(`📤 Sending ${audioFile.data.length} bytes to Whisper Worker...`)
 
-    // Create FormData for worker
     const workerFormData = new FormData()
     const audioBlob = new Blob([new Uint8Array(audioFile.data)], { type: audioFile.type || 'audio/webm' })
     workerFormData.append('audio', audioBlob, audioFile.filename || 'recording.webm')
 
-    // Send to Cloudflare Worker
-    const headers: Record<string, string> = {}
-    if (CLOUDFLARE_AUTH_TOKEN) {
-      headers['Authorization'] = `Bearer ${CLOUDFLARE_AUTH_TOKEN}`
-    }
-
-    const response = await fetch(CLOUDFLARE_WORKER_URL, {
+    const response = await fetch(WHISPER_ENDPOINT, {
       method: 'POST',
-      headers,
+      headers: {
+        'Authorization': `Bearer ${WORKER_TOKEN}`
+      },
       body: workerFormData
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      console.error('Cloudflare Worker error:', errorData)
+      console.error('Whisper Worker error:', errorData)
       throw createError({
         statusCode: response.status,
         statusMessage: `Transcription failed: ${errorData.message || errorData.error}`
@@ -80,7 +80,6 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     console.error('Transcription error:', error)
     
-    // Re-throw if already a createError
     if (error && typeof error === 'object' && 'statusCode' in error) {
       throw error
     }

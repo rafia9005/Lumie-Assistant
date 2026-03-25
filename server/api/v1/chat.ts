@@ -1,6 +1,3 @@
-// Nuxt Nitro handler for Gemini chat with session history
-// Install: npm install @google/genai
-
 import { GoogleGenAI } from '@google/genai';
 import fs from 'fs/promises';
 import path from 'path';
@@ -40,7 +37,6 @@ async function appendMessage(sessionId: string, message: { role: string; text: s
     await saveChat(sessionId, msgs);
 }
 
-// Nuxt Nitro POST handler - returns full response as JSON
 export default defineEventHandler(async (event) => {
     const config = useRuntimeConfig();
     const body = await readBody(event);
@@ -63,26 +59,22 @@ export default defineEventHandler(async (event) => {
 
     const ai = new GoogleGenAI({ apiKey: config.geminiToken });
 
-     // Load chat history and build contents
      const history = await loadChat(sessionId);
      const contents: any[] = [];
+     const userMessage = input;
 
-     // Always prepend system prompt to maintain character consistency
-     const userMessage = `${systemPrompt}\n\n${input}`;
-
-     // Add history messages
      for (const m of history) {
-         // Map stored roles to Gemini roles: 'assistant' -> 'model', others -> 'user'
          const role = m.role === 'assistant' ? 'model' : 'user';
          contents.push({ role, parts: [{ text: m.text }] });
      }
 
-     // Add current user message with system prompt
      contents.push({ role: 'user', parts: [{ text: userMessage }] });
      await appendMessage(sessionId, { role: 'user', text: input });
 
     try {
-        const modelConfig = { thinkingConfig: { thinkingBudget: -1 } };
+        const modelConfig = { thinkingConfig: { thinkingBudget: -1 }, systemInstruction: {
+            text: systemPrompt,
+        } };
         let assistantText = '';
 
         const response = await ai.models.generateContentStream({
@@ -91,7 +83,6 @@ export default defineEventHandler(async (event) => {
             contents
         });
 
-        // Collect all streamed chunks
         for await (const chunkRaw of response) {
             const chunk: any = chunkRaw;
             const text = (chunk?.text) || (chunk?.candidates?.[0]?.content?.[0]?.text) || '';
@@ -100,12 +91,10 @@ export default defineEventHandler(async (event) => {
             }
         }
 
-        // Save assistant response to history
         if (assistantText) {
             await appendMessage(sessionId, { role: 'assistant', text: assistantText });
         }
 
-        // Return JSON response
         setHeader(event, 'Content-Type', 'application/json');
         return {
             ok: true,
