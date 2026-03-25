@@ -20,13 +20,12 @@ export const useMediaRecorderVoice = () => {
           audioChunks.value.push(event.data)
         }
       }
-      recorder.start()
-      mediaRecorder.value = recorder
-      isRecording.value = true
-      console.log('🎤 Recording started')
-      return true
+       recorder.start()
+       mediaRecorder.value = recorder
+       isRecording.value = true
+       return true
     } catch (err: any) {
-      console.error('❌ Failed to start recording:', err)
+      console.error('Failed to start recording:', err)
       errorMessage.value = `Microphone error: ${err.message}`
       return false
     }
@@ -39,17 +38,16 @@ export const useMediaRecorderVoice = () => {
         return
       }
 
-      mediaRecorder.value.onstop = () => {
-        const audioBlob = new Blob(audioChunks.value, { type: 'audio/webm' })
-        if (mediaRecorder.value?.stream) {
-          mediaRecorder.value.stream.getTracks().forEach(track => track.stop())
-        }
-        mediaRecorder.value = null
-        isRecording.value = false
-        audioChunks.value = []
-        console.log('⏹️ Recording stopped, blob size:', audioBlob.size)
-        resolve(audioBlob)
-      }
+       mediaRecorder.value.onstop = () => {
+         const audioBlob = new Blob(audioChunks.value, { type: 'audio/webm' })
+         if (mediaRecorder.value?.stream) {
+           mediaRecorder.value.stream.getTracks().forEach(track => track.stop())
+         }
+         mediaRecorder.value = null
+         isRecording.value = false
+         audioChunks.value = []
+         resolve(audioBlob)
+       }
 
       mediaRecorder.value.stop()
     })
@@ -64,13 +62,12 @@ export const useMediaRecorderVoice = () => {
           'Content-Type': 'multipart/form-data'
         }
       })
-      if (response.data?.text) {
-        console.log('✅ Transcription:', response.data.text)
-        return response.data.text
-      }
+       if (response.data?.text) {
+         return response.data.text
+       }
       return null
     } catch (error) {
-      console.error('❌ Transcription error:', error)
+      console.error('Transcription error:', error)
       errorMessage.value = 'Transcription failed'
       return null
     }
