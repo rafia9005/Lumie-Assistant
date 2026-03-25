@@ -10,7 +10,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig()
-  const AURA_2_TOKEN = config.aura2Token
+  const AURA_2_TOKEN = config.workerToken
 
   if (!AURA_2_TOKEN) {
     throw createError({

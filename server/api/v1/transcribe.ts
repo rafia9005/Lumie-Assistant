@@ -10,13 +10,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig()
-  const CLOUDFLARE_ACCOUNT_ID = config.cloudflareAccountId
-  const CLOUDFLARE_API_TOKEN = config.cloudflareApiToken
+  const CLOUDFLARE_WORKER_URL = process.env.CLOUDFLARE_WORKER_URL || config.cloudflareWorkerUrl
+  const CLOUDFLARE_AUTH_TOKEN = process.env.CLOUDFLARE_AUTH_TOKEN || config.cloudflareAuthToken
 
-  if (!CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_API_TOKEN) {
+  if (!CLOUDFLARE_WORKER_URL) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Cloudflare credentials not configured'
+      statusMessage: 'Cloudflare Worker URL not configured. Please deploy the worker and set CLOUDFLARE_WORKER_URL in .env'
     })
   }
 
@@ -40,36 +40,41 @@ export default defineEventHandler(async (event) => {
       })
     }
 
-    // Convert Buffer to Uint8Array for fetch body
-    const audioArray = new Uint8Array(audioFile.data)
+    console.log(`📤 Sending ${audioFile.data.length} bytes to Cloudflare Worker...`)
 
-    // Send to Cloudflare Workers AI Whisper model
-    // Using @cf/openai/whisper (free tier available)
-    const whisperUrl = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/run/@cf/openai/whisper`
-    
-    const response = await fetch(whisperUrl, {
+    // Create FormData for worker
+    const workerFormData = new FormData()
+    const audioBlob = new Blob([new Uint8Array(audioFile.data)], { type: audioFile.type || 'audio/webm' })
+    workerFormData.append('audio', audioBlob, audioFile.filename || 'recording.webm')
+
+    // Send to Cloudflare Worker
+    const headers: Record<string, string> = {}
+    if (CLOUDFLARE_AUTH_TOKEN) {
+      headers['Authorization'] = `Bearer ${CLOUDFLARE_AUTH_TOKEN}`
+    }
+
+    const response = await fetch(CLOUDFLARE_WORKER_URL, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${CLOUDFLARE_API_TOKEN}`,
-        'Content-Type': audioFile.type || 'audio/webm',
-      },
-      body: audioArray
+      headers,
+      body: workerFormData
     })
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      console.error('Cloudflare AI error:', errorData)
+      console.error('Cloudflare Worker error:', errorData)
       throw createError({
         statusCode: response.status,
-        statusMessage: `Cloudflare AI error: ${JSON.stringify(errorData)}`
+        statusMessage: `Transcription failed: ${errorData.message || errorData.error}`
       })
     }
 
     const result = await response.json()
     
-    // Cloudflare Whisper returns: { result: { text: "transcription" } }
+    console.log('✅ Transcription successful:', result.text)
+    
     return {
-      text: result.result?.text || '',
+      text: result.text || '',
+      language: result.language || 'en',
       success: true
     }
   } catch (error: any) {
