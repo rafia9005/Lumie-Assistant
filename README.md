@@ -2,7 +2,7 @@
 
 A modern AI voice chat application with real-time speech recognition, intelligent responses, and expressive character animations.
 
-https://github.com/user-attachments/assets/1e8f0c0f-c136-4789-994f-d17032c8fe5e
+https://github.com/user-attachments/assets/7c0d78a2-594f-4f82-b21f-479378e5b7ea
 
 ## Features
 
