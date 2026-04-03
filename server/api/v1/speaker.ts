@@ -1,4 +1,5 @@
-import type { AuraInput } from '../../../types/speaker'
+import { speaker } from '~~/context/character'
+import type { AuraInput, Speaker } from '../../../types/speaker'
 
 export default defineEventHandler(async (event) => {
   if (event.method !== 'POST') {
@@ -36,7 +37,8 @@ export default defineEventHandler(async (event) => {
   }
 
   const payload: AuraInput = {
-    text: body.text
+    text: body.text,
+    speaker: speaker as Speaker
   }
 
   if (body.speaker) payload.speaker = body.speaker
